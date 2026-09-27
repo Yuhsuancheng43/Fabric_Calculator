@@ -1,0 +1,10 @@
+.footer {
+  background-color: var(--color-text);
+  color: var(--color-bg);
+  text-align: center;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 1.0rem;
+  margin: 0;
+  padding: 1rem;
+}

@@ -1,0 +1,33 @@
+.header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-surface);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.header-title {
+  text-align: center;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 700;
+  font-size: 1.6rem;
+  margin: 0;
+}
+
+.header-spacer {
+  justify-self: start;
+  width: 40px;
+}
+
+.profile-link {
+  justify-self: end;
+}
+
+.profile-picture {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-primary);
+}
