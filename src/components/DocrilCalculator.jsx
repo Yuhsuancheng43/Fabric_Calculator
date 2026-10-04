@@ -3,15 +3,18 @@ import { useState, Fragment } from "react";
 import { calculateRow } from '../calculations';
 
 /**
- * Fixed fabric specifications for Docril.
- * rollWidth: width of one fabric roll (mm), used to work out how many panels are needed.
- * rollerAddition: extra length always added to the drop, regardless of flap.
- * flapAddition: extra length added to the drop only when the row has a flap.
+ * Fixed fabric specifications for Docril (confirmed with the factory).
+ * panelMaxWidths: largest skin width (mm) that fits in 1, 2, 3... panels (the roll is 1200mm wide).
+ * flapAddition / noFlapAddition: extra length (mm) added to the drop, depending on whether the row has a flap.
+ * noFlapAdditionMultiStopRollup: replaces noFlapAddition when the order is MultiStop or Rollup.
+ * totalAddition: extra length (mm) added once to the whole order's total, never per row.
  */
 const docrilSettings = {
-    rollWidth: 1200,
-    rollerAddition: 200,
-    flapAddition: 400
+    panelMaxWidths: [1150, 2325, 3500, 4675, 5850, 7025],
+    flapAddition: 500,
+    noFlapAddition: 300,
+    noFlapAdditionMultiStopRollup: 400,
+    totalAddition: 200
 };
 
 /**
@@ -29,25 +32,25 @@ function createEmptyRow(id) {
  * @param {number} drop - original drop input (mm)
  * @param {boolean} hasFlap - whether the flap addition applies
  * @param {object} result - the success result returned by calculateRow
- * @returns {string} three lines joined by \n: panel division, drop addition, panel total
+ * @returns {string} three lines joined by \n: panel count, drop addition, panel total
  */
 function buildOutputText(width, drop, hasFlap, result) {
-    const { panelsPerUnit, dropRaw, dropRounded, totalPanels, rowTotalMetres } = result.data;
-    const flapPart = hasFlap ? ` + ${docrilSettings.flapAddition} (flap)` : '';
+    const { panelsPerUnit, addition, dropRaw, dropRounded, totalPanels, rowTotalMetres } = result.data;
+    const flapLabel = hasFlap ? ' (flap)' : '';
 
-    // e.g. "2900 / 1200 = 2.4 => 3"
-    const line0 = `• ${width} / ${docrilSettings.rollWidth} = ${(width / docrilSettings.rollWidth).toFixed(1)} => ${panelsPerUnit}`;
-    // e.g. "1650 + 200 (roller) + 400 (flap) = 2250"
-    const line1 = `• ${drop} + ${docrilSettings.rollerAddition} (roller)${flapPart} = ${dropRaw}`;
-    // e.g. "3 Panels @ 2.3m = 6.9m Total"
-    const line2 = `• ${totalPanels} Panels @ ${dropRounded / 1000}m = ${rowTotalMetres}m Total`;
+    // e.g. "2800 => 3 Panels"
+    const line0 = `• ${width} => ${panelsPerUnit} Panels`;
+    // e.g. "1650 + 500 (flap) = 2150" or "1800 + 300 = 2100"
+    const line1 = `• ${drop} + ${addition}${flapLabel} = ${dropRaw}`;
+    // e.g. "3 Panels @ 2.2m = 6.6m"
+    const line2 = `• ${totalPanels} Panels @ ${dropRounded / 1000}m = ${rowTotalMetres}m`;
 
     return `${line0}\n${line1}\n${line2}`;
 }
 
 /**
- * Combines every row's output text into the full textarea content, plus a
- * grand total line summing all rows.
+ * Combines every row's output text into the full textarea content, followed
+ * by the order total (all rows added together, plus the fixed addition once).
  * @param {Array} rows - the current rows state (raw string inputs)
  * @param {Array} results - calculateRow results, one per row, same order as rows
  * @returns {string} the full text to show in the output textarea
@@ -58,34 +61,38 @@ function buildAllOutputText(rows, results) {
         return label + buildOutputText(parseInt(row.width), parseInt(row.drop), row.hasFlap, results[index]);
     });
 
-    if (rows.length === 1) {
-        return blocks[0];
-    }
-
-    const grandTotal = results.reduce((sum, r) => sum + r.data.rowTotalMetres, 0);
-    // Only meaningful to show "N Panels @ Xm" for the grand total when every
-    // row rounds to the same drop length - otherwise the panels are different
-    // lengths and can't be combined into one "@ length" figure.
+    // Totals stay in whole millimetres until the very end to avoid floating-point noise.
+    const rowTotals = results.map(r => r.data.rowTotal);
+    const subtotal = rowTotals.reduce((sum, t) => sum + t, 0);
+    const total = subtotal + docrilSettings.totalAddition;
+    // Only meaningful to show "N Panels @ Xm" when every row rounds to the
+    // same drop length - otherwise the panels are different lengths and can't
+    // be combined into one "@ length" figure.
     const allSameDrop = results.every(r => r.data.dropRounded === results[0].data.dropRounded);
 
-    let totalLine;
-    if (allSameDrop) {
+    let summaryLines;
+    if (rows.length > 1 && allSameDrop) {
         const totalPanelsSum = results.reduce((sum, r) => sum + r.data.totalPanels, 0);
-        const dropRoundedMetres = results[0].data.dropRounded / 1000;
-        totalLine = `Grand Total: ${totalPanelsSum} Panels @ ${dropRoundedMetres}m = ${grandTotal.toFixed(1)}m Total`;
+        summaryLines = [
+            `${totalPanelsSum} Panels @ ${results[0].data.dropRounded / 1000}m = ${subtotal / 1000}m`,
+            `Total: ${subtotal} + ${docrilSettings.totalAddition} = ${total / 1000}m`
+        ];
     } else {
-        totalLine = `Grand Total: ${grandTotal.toFixed(1)}m`;
+        summaryLines = [`Total: ${rowTotals.join(' + ')} + ${docrilSettings.totalAddition} = ${total / 1000}m`];
     }
 
-    return `${blocks.join('\n\n')}\n\n${totalLine}`;
+    const rowSeparator = '-'.repeat(30);
+    const totalSeparator = '='.repeat(30);
+    return `${blocks.join(`\n${rowSeparator}\n`)}\n${totalSeparator}\n${summaryLines.join('\n')}`;
 }
 
 /**
  * Docril fabric calculator page: a list of rows (width/drop/flap/quantity),
  * each row can be added or removed, and Calculate produces an editable
  * text summary of how much fabric to order.
+ * @param {boolean} isMultiStopOrRollup - when true, rows without a flap use the larger no-flap addition
  */
-function Docril() {
+function Docril({ isMultiStopOrRollup }) {
     // Each row holds its own raw input values; inputs are still strings here
     // and get converted to numbers only when calculating (see handleCalculate).
     const [rows, setRows] = useState([createEmptyRow(1)]);
@@ -118,7 +125,10 @@ function Docril() {
             drop: parseInt(row.drop),
             hasFlap: row.hasFlap,
             quantity: parseInt(row.quantity),
-            ...docrilSettings
+            ...docrilSettings,
+            noFlapAddition: isMultiStopOrRollup
+                ? docrilSettings.noFlapAdditionMultiStopRollup
+                : docrilSettings.noFlapAddition
         }));
 
         const firstError = results.find(r => !r.success);
@@ -203,7 +213,7 @@ function Docril() {
                     className="output-textarea"
                     value={outputText}
                     onChange={(e) => setOutputText(e.target.value)}
-                    rows={5}
+                    rows={Math.max(5, outputText.split('\n').length)}
                     wrap="off"
                 />
             </div>

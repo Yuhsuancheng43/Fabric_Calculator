@@ -1,6 +1,6 @@
 import './FabricNav.css';
 
-const fabrics = ['Docril', 'Outlook'];
+const fabrics = ['Docril', 'Outlook', 'Vistaweave'];
 
 function FabricNav({ selectedFabric, onSelectFabric }) {
     return (

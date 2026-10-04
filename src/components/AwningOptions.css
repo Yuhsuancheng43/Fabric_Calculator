@@ -1,0 +1,21 @@
+.awning-options {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0 1rem 0.75rem;
+}
+
+.awning-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.awning-option input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-success-dark);
+}

@@ -1,4 +1,4 @@
-export function calculateRow({ width, drop, hasFlap, quantity, rollWidth, rollerAddition, flapAddition}) {
+export function calculateRow({ width, drop, hasFlap, quantity, panelMaxWidths, flapAddition, noFlapAddition }) {
     try {
         // Width validation
         if (typeof width !== 'number' || Number.isNaN(width) || width <= 0) {
@@ -20,19 +20,24 @@ export function calculateRow({ width, drop, hasFlap, quantity, rollWidth, roller
             throw new Error('Invalid quantity value.');
         }
 
-        // Roll Width validation
-        if (typeof rollWidth !== 'number' || Number.isNaN(rollWidth) || rollWidth <= 0) {
-            throw new Error('Invalid rollWidth value.');
+        // Panel width table validation
+        if (!Array.isArray(panelMaxWidths) || panelMaxWidths.length === 0) {
+            throw new Error('Invalid panelMaxWidths value.');
         }
 
-        // Panels needed for ONE unit of this width
-        const panelsPerUnit = Math.ceil(width / rollWidth);
+        // Panels needed for ONE unit of this width: the first table entry that fits the width.
+        // panelMaxWidths[0] is the max width for 1 panel, [1] for 2 panels, and so on.
+        const panelsPerUnit = panelMaxWidths.findIndex(maxWidth => width <= maxWidth) + 1;
+        if (panelsPerUnit === 0) {
+            throw new Error(`Width exceeds the maximum supported width (${panelMaxWidths[panelMaxWidths.length - 1]}mm).`);
+        }
 
         // Total panels needed for the quantity
         const totalPanels = panelsPerUnit * quantity;
 
-        // dropRaw calculation
-        const dropRaw = drop + rollerAddition + (hasFlap ? flapAddition : 0);
+        // Extra length added to the drop, then the drop after that addition
+        const addition = hasFlap ? flapAddition : noFlapAddition;
+        const dropRaw = drop + addition;
 
         // Round dropRaw to the nearest 100
         const dropRounded = Math.ceil(dropRaw / 100) * 100;
@@ -45,6 +50,7 @@ export function calculateRow({ width, drop, hasFlap, quantity, rollWidth, roller
             data: {
                 panelsPerUnit,
                 totalPanels,
+                addition,
                 dropRaw,
                 dropRounded,
                 rowTotal,
