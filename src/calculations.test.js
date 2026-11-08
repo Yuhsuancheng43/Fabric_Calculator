@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateRow } from "./calculations";
+import { calculateDocrilRow, calculateOutlookRow } from "./calculations";
 
 const docrilSettings = {
     panelMaxWidths: [1150, 2325, 3500, 4675, 5850, 7025],
@@ -7,9 +7,9 @@ const docrilSettings = {
     noFlapAddition: 300
 };
 
-describe('calculateRow', () => {
+describe('calculateDocrilRow', () => {
     it('calculate correctly for a standard case with flap', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 2900,
             drop: 1650,
             hasFlap: true,
@@ -26,7 +26,7 @@ describe('calculateRow', () => {
     });
 
     it('calculate correctly for a standard case without flap', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 2900,
             drop: 1650,
             hasFlap: false,
@@ -43,7 +43,7 @@ describe('calculateRow', () => {
     });
 
     it('uses whatever no-flap addition it is given (400 for MultiStop / Rollup)', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 2800,
             drop: 1800,
             hasFlap: false,
@@ -58,7 +58,7 @@ describe('calculateRow', () => {
     });
 
     it('does not use the no-flap addition when the row has a flap', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 2800,
             drop: 1800,
             hasFlap: true,
@@ -71,7 +71,7 @@ describe('calculateRow', () => {
     });
 
     it('multiplies panels correctly when quantity is greater than 1', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 2900,
             drop: 1650,
             hasFlap: true,
@@ -86,7 +86,7 @@ describe('calculateRow', () => {
     });
 
     it('does not round up when dropRaw is already a multiple of 100', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 2800,
             drop: 1800,
             hasFlap: false,
@@ -99,8 +99,8 @@ describe('calculateRow', () => {
     });
 
     it('matches the worked example: two rows, no flap, drop 1800', () => {
-        const rowA = calculateRow({ width: 2800, drop: 1800, hasFlap: false, quantity: 1, ...docrilSettings });
-        const rowB = calculateRow({ width: 3450, drop: 1800, hasFlap: false, quantity: 1, ...docrilSettings });
+        const rowA = calculateDocrilRow({ width: 2800, drop: 1800, hasFlap: false, quantity: 1, ...docrilSettings });
+        const rowB = calculateDocrilRow({ width: 3450, drop: 1800, hasFlap: false, quantity: 1, ...docrilSettings });
 
         expect(rowA.data.totalPanels + rowB.data.totalPanels).toBe(6);
         expect(rowA.data.dropRounded).toBe(2100);
@@ -120,14 +120,14 @@ describe('calculateRow', () => {
         [5851, 6],
         [7025, 6]
     ])('width %i needs %i panel(s)', (width, expectedPanels) => {
-        const result = calculateRow({ width, drop: 1800, hasFlap: false, quantity: 1, ...docrilSettings });
+        const result = calculateDocrilRow({ width, drop: 1800, hasFlap: false, quantity: 1, ...docrilSettings });
 
         expect(result.success).toBe(true);
         expect(result.data.panelsPerUnit).toBe(expectedPanels);
     });
 
     it('returns a failure result when width is wider than the largest panel range', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: 7026,
             drop: 1800,
             hasFlap: false,
@@ -140,7 +140,7 @@ describe('calculateRow', () => {
     });
 
     it('returns a failure result when width is invalid', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: -1000,
             drop: 1650,
             hasFlap: true,
@@ -153,7 +153,7 @@ describe('calculateRow', () => {
     });
 
     it('returns a failure result when width is NaN', () => {
-        const result = calculateRow({
+        const result = calculateDocrilRow({
             width: NaN,
             drop: 1650,
             hasFlap: true,
@@ -162,5 +162,126 @@ describe('calculateRow', () => {
         });
 
         expect(result.success).toBe(false);
+    });
+});
+
+const outlookSettings = {
+    maxWidth: 3200,
+    flapAddition: 500,
+    zipscreenAddition: 200
+};
+
+describe('calculateOutlookRow', () => {
+    it('matches the worked example: 2 x width 2110, drop 2100, flap', () => {
+        const result = calculateOutlookRow({
+            width: 2110,
+            drop: 2100,
+            hasFlap: true,
+            quantity: 2,
+            isZipscreen: false,
+            ...outlookSettings
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.data.totalPanels).toBe(2); // one panel per unit
+        expect(result.data.addition).toBe(500);
+        expect(result.data.dropRounded).toBe(2600); // 2100 + 500
+        expect(result.data.rowTotal).toBe(5200); // 2 * 2600
+    });
+
+    it('matches the worked example: two rows with different drops', () => {
+        const rowA = calculateOutlookRow({ width: 2160, drop: 1800, hasFlap: true, quantity: 1, isZipscreen: false, ...outlookSettings });
+        const rowB = calculateOutlookRow({ width: 1800, drop: 900, hasFlap: true, quantity: 1, isZipscreen: false, ...outlookSettings });
+
+        expect(rowA.data.rowTotal).toBe(2300); // 1800 + 500
+        expect(rowB.data.rowTotal).toBe(1400); // 900 + 500
+    });
+
+    it('rounds the drop up to the nearest 100', () => {
+        const result = calculateOutlookRow({
+            width: 2000,
+            drop: 1975,
+            hasFlap: true,
+            quantity: 1,
+            isZipscreen: false,
+            ...outlookSettings
+        });
+
+        expect(result.data.dropRaw).toBe(2475); // 1975 + 500
+        expect(result.data.dropRounded).toBe(2500);
+    });
+
+    it('allows a width of exactly 3200 (one panel)', () => {
+        const result = calculateOutlookRow({
+            width: 3200,
+            drop: 1800,
+            hasFlap: true,
+            quantity: 1,
+            isZipscreen: false,
+            ...outlookSettings
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.data.panelsPerUnit).toBe(1);
+    });
+
+    it.each([
+        [true],
+        [false]
+    ])('zipscreen adds 200 to the drop whatever the flap is (flap: %s)', (hasFlap) => {
+        const result = calculateOutlookRow({
+            width: 2000,
+            drop: 1800,
+            hasFlap,
+            quantity: 1,
+            isZipscreen: true,
+            ...outlookSettings
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.data.addition).toBe(200);
+        expect(result.data.rowTotal).toBe(2000); // 1800 + 200
+    });
+
+    it('returns a failure result when width is over 3200 (rule not decided yet)', () => {
+        const result = calculateOutlookRow({
+            width: 3201,
+            drop: 1800,
+            hasFlap: true,
+            quantity: 1,
+            isZipscreen: false,
+            ...outlookSettings
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe("Outlook widths over 3200mm aren't supported yet.");
+    });
+
+    it('returns a failure result for no flap and no zipscreen (rule not decided yet)', () => {
+        const result = calculateOutlookRow({
+            width: 2000,
+            drop: 1800,
+            hasFlap: false,
+            quantity: 1,
+            isZipscreen: false,
+            ...outlookSettings
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe("Outlook rows without a flap aren't supported yet (unless Zipscreen is ticked).");
+    });
+
+    it('returns a failure result when width is invalid', () => {
+        const result = calculateOutlookRow({
+            width: -1,
+            drop: 1800,
+            hasFlap: true,
+            quantity: 1,
+            isZipscreen: false,
+            ...outlookSettings
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Invalid width value.');
     });
 });

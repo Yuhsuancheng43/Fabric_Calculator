@@ -1,20 +1,27 @@
 import './AwningOptions.css';
 
 /**
- * Order-level option shown under the fabric buttons.
- * Controlled by App so the selected value can also reach the calculator.
+ * Order-level checkboxes shown under the fabric buttons.
+ * Controlled by App so the chosen values can also reach the calculator.
+ * @param {Array<{label: string, checked: boolean, onChange: Function}>} options - one checkbox per entry
  */
-function AwningOptions({ isMultiStopOrRollup, onMultiStopOrRollupChange }) {
+function AwningOptions({ options }) {
+    if (options.length === 0) {
+        return null;
+    }
+
     return (
         <div className="awning-options">
-            <label className="awning-option">
-                <input
-                    type="checkbox"
-                    checked={isMultiStopOrRollup}
-                    onChange={(e) => onMultiStopOrRollupChange(e.target.checked)}
-                />
-                MultiStop / Rollup
-            </label>
+            {options.map(option => (
+                <label key={option.label} className="awning-option">
+                    <input
+                        type="checkbox"
+                        checked={option.checked}
+                        onChange={(e) => option.onChange(e.target.checked)}
+                    />
+                    {option.label}
+                </label>
+            ))}
         </div>
     );
 }

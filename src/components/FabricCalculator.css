@@ -1,11 +1,11 @@
-.docril-page {
+.calculator-page {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 1rem;
 }
 
-.docril-card {
+.calculator-card {
   width: 100%;
   max-width: 560px;
   background-color: var(--color-surface);

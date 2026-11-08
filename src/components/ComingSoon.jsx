@@ -3,7 +3,7 @@ import './ComingSoon.css';
 function ComingSoon({ fabric }) {
     return (
         <div className="coming-soon">
-            <p>{fabric} calculator coming soon.</p>
+            <p>{fabric} : ask Wendy :)</p>
         </div>
     );
 }
